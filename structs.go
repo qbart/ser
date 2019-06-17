@@ -1,12 +1,19 @@
 package main
 
+import "time"
+
 type AwsInstance struct {
-	state       string
+	state       int64
+	ami         string
 	ipv4        string
 	id          string
 	kind        string
 	zone        string
 	name        string
 	environment string
-	launch_at   string
+	launchTime  time.Time
+}
+
+type Dashboard struct {
+	instances []*AwsInstance
 }

@@ -3,21 +3,30 @@ package main
 import (
 	"fmt"
 
-	"github.com/go-ini/ini"
-	// "github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 )
 
 func main() {
+	// box := tview.NewBox().SetBorder(true).SetTitle("Instances")
 
-	cfg, err := ini.Load(
-		"~/.aws/credentials",
-	)
-	if err != nil {
-		fmt.Println(cfg)
-		fmt.Println(cfg.Section(profile).Key("aws_access_key_id").String())
-		fmt.Println(cfg.Section(profile).Key("aws_secret_access_key").String())
-	} else {
-		fmt.Println(err)
+	// if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
+	// 	panic(err)
+	// }
+
+	session := awsNewSession(endpoints.EuWest1RegionID, "default")
+
+	dashboard := &Dashboard{}
+	dashboard.instances = awsGetInstances(session)
+
+	for _, instance := range dashboard.instances {
+		fmt.Println(instance.id)
+		fmt.Println(instance.name)
+		fmt.Println(instance.environment)
+		fmt.Println(instance.ipv4)
+		fmt.Println(instance.kind)
+		fmt.Println(awsInstanceStatusDot(instance.state))
+		fmt.Println(instance.ami)
+		fmt.Println(instance.zone)
+		fmt.Println(instance.launchTime)
 	}
-	// sess := session.Must(session.NewSession())
 }
