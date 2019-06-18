@@ -30,8 +30,16 @@ type AwsTargetGroup struct {
 	port             int64
 	protocol         string
 	kind             string
-	targets          []string
 	loadBalancerArns []string
+	targets          []*AwsTargetHealth
+}
+
+type AwsTargetHealth struct {
+	instanceId string
+	state      string
+	zone       string
+	port       int64
+	reason     string
 }
 
 type Dashboard struct {

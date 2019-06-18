@@ -17,8 +17,8 @@ func main() {
 	session := awsNewSession(endpoints.EuWest1RegionID, "default")
 
 	dashboard := &Dashboard{}
-	// dashboard.instances = awsGetInstances(session)
-	// dashboard.loadBalancers = awsGetLoadBalancers(session)
+	dashboard.instances = awsGetInstances(session)
+	dashboard.loadBalancers = awsGetLoadBalancers(session)
 	dashboard.targetGroups = awsGetTargetGroups(session)
 
 	for _, instance := range dashboard.instances {
@@ -51,6 +51,16 @@ func main() {
 		fmt.Println(target.port)
 		fmt.Println(target.protocol)
 		fmt.Println(strings.Join(target.loadBalancerArns, ", "))
+		target.targets = awsGetTargetHealth(session, target.arn)
+
+		for _, t := range target.targets {
+			fmt.Printf("  %s\n", awsTargetHealthStatusDot(t.state))
+			fmt.Printf("  %s\n", t.instanceId)
+			fmt.Printf("  %d\n", t.port)
+			fmt.Printf("  %s\n", t.reason)
+			fmt.Printf("  %s\n", t.zone)
+			fmt.Println("  --")
+		}
 		fmt.Println("----------")
 	}
 }

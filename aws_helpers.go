@@ -8,9 +8,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 )
 
-const DotRed = "\033[31;1m●\033[0m"
-const DotGreen = "\033[32;1m●\033[0m"
-const DotYellow = "\033[33;1m●\033[0m"
+const DotRed = "\033[31m●\033[0m"
+const DotGreen = "\033[32m●\033[0m"
+const DotYellow = "\033[33m●\033[0m"
+const DotGrey = "\033[90m●\033[0m"
 
 func awsFindTag(tags []*ec2.Tag, lookupValue string) *string {
 	for _, tag := range tags {
@@ -38,9 +39,9 @@ func awsCheckErrors(err error) bool {
 	return false
 }
 
-func dashify(str *string) string {
+func toS(str *string) string {
 	if str == nil {
-		return "-"
+		return ""
 	}
 
 	return *str
@@ -72,6 +73,26 @@ func awsLoadBalancerStatusDot(state string) string {
 		return DotGreen
 	case "failed":
 		return DotRed
+	default:
+		return DotYellow
+	}
+}
+
+func awsTargetHealthStatusDot(state string) string {
+	// "initial"
+	// "healthy"
+	// "unhealthy"
+	// "unused"
+	// "draining"
+	// "unavailable"
+
+	switch state {
+	case "healthy":
+		return DotGreen
+	case "unhealthy", "unavailable":
+		return DotRed
+	case "unused":
+		return DotGrey
 	default:
 		return DotYellow
 	}
