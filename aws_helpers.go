@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 
+	"github.com/gdamore/tcell"
+
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 )
 
+const Dot = "●"
 const DotRed = "\033[31m●\033[0m"
 const DotGreen = "\033[32m●\033[0m"
 const DotYellow = "\033[33m●\033[0m"
@@ -47,7 +50,7 @@ func toS(str *string) string {
 	return *str
 }
 
-func awsInstanceStatusDot(state int64) string {
+func awsInstanceStatusColor(state int64) tcell.Color {
 	// 0 (pending)
 	// 16 (running)
 	// 32 (shutting-down)
@@ -57,11 +60,11 @@ func awsInstanceStatusDot(state int64) string {
 
 	switch state {
 	case 16:
-		return DotGreen
+		return tcell.ColorGreen
 	case 48, 80:
-		return DotRed
+		return tcell.ColorRed
 	default:
-		return DotYellow
+		return tcell.ColorYellow
 	}
 }
 
