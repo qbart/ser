@@ -14,6 +14,16 @@ type AwsInstance struct {
 	launchTime  time.Time
 }
 
+type AwsLoadBalancer struct {
+	name   string
+	dns    string
+	state  string
+	zones  []string
+	kind   string
+	scheme string
+}
+
 type Dashboard struct {
-	instances []*AwsInstance
+	instances     []*AwsInstance
+	loadBalancers []*AwsLoadBalancer
 }
