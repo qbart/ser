@@ -55,12 +55,37 @@ func awsGetLoadBalancers(sess *session.Session) []*AwsLoadBalancer {
 
 	for _, loadBalancer := range response.LoadBalancers {
 		row := &AwsLoadBalancer{
+			arn:    *loadBalancer.LoadBalancerArn,
 			name:   dashify(loadBalancer.LoadBalancerName),
 			dns:    dashify(loadBalancer.DNSName),
 			kind:   dashify(loadBalancer.Type),
 			scheme: dashify(loadBalancer.Scheme),
 			state:  dashify(loadBalancer.State.Code),
 			zones:  awsZonesToList(loadBalancer.AvailabilityZones),
+		}
+		result = append(result, row)
+	}
+
+	return result
+}
+
+func awsGetTargetGroups(sess *session.Session) []*AwsTargetGroup {
+	client := elbv2.New(sess)
+	input := &elbv2.DescribeTargetGroupsInput{}
+
+	response, err := client.DescribeTargetGroups(input)
+	awsCheckErrors(err)
+
+	result := make([]*AwsTargetGroup, 0)
+
+	for _, targetGroup := range response.TargetGroups {
+		row := &AwsTargetGroup{
+			arn:              *targetGroup.TargetGroupArn,
+			name:             dashify(targetGroup.TargetGroupName),
+			port:             *targetGroup.Port,
+			protocol:         dashify(targetGroup.Protocol),
+			kind:             dashify(targetGroup.TargetType),
+			loadBalancerArns: awsCopyList(targetGroup.LoadBalancerArns),
 		}
 		result = append(result, row)
 	}

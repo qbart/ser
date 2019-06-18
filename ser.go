@@ -17,8 +17,9 @@ func main() {
 	session := awsNewSession(endpoints.EuWest1RegionID, "default")
 
 	dashboard := &Dashboard{}
-	dashboard.instances = awsGetInstances(session)
-	dashboard.loadBalancers = awsGetLoadBalancers(session)
+	// dashboard.instances = awsGetInstances(session)
+	// dashboard.loadBalancers = awsGetLoadBalancers(session)
+	dashboard.targetGroups = awsGetTargetGroups(session)
 
 	for _, instance := range dashboard.instances {
 		fmt.Println(awsInstanceStatusDot(instance.state))
@@ -40,6 +41,16 @@ func main() {
 		fmt.Println(balancer.kind)
 		fmt.Println(balancer.scheme)
 		fmt.Println(strings.Join(balancer.zones, ", "))
+		fmt.Println("----------")
+	}
+
+	for _, target := range dashboard.targetGroups {
+		fmt.Println(target.arn)
+		fmt.Println(target.kind)
+		fmt.Println(target.name)
+		fmt.Println(target.port)
+		fmt.Println(target.protocol)
+		fmt.Println(strings.Join(target.loadBalancerArns, ", "))
 		fmt.Println("----------")
 	}
 }

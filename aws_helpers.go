@@ -86,3 +86,11 @@ func awsZonesToList(zones []*elbv2.AvailabilityZone) []string {
 
 	return result
 }
+
+func awsCopyList(list []*string) []string {
+	result := make([]string, len(list))
+	for i, str := range list {
+		result[i] = *str
+	}
+	return result
+}

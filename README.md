@@ -16,7 +16,8 @@ Dashboard (WIP)
                 "ec2:DescribeTags",
                 "ec2:DescribeInstanceAttribute",
                 "ec2:DescribeInstanceStatus",
-                "elasticloadbalancing:DescribeLoadBalancers"
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeTargetGroups"
             ],
             "Resource": "*"
         }

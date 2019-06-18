@@ -15,6 +15,7 @@ type AwsInstance struct {
 }
 
 type AwsLoadBalancer struct {
+	arn    string
 	name   string
 	dns    string
 	state  string
@@ -23,7 +24,18 @@ type AwsLoadBalancer struct {
 	scheme string
 }
 
+type AwsTargetGroup struct {
+	arn              string
+	name             string
+	port             int64
+	protocol         string
+	kind             string
+	targets          []string
+	loadBalancerArns []string
+}
+
 type Dashboard struct {
 	instances     []*AwsInstance
 	loadBalancers []*AwsLoadBalancer
+	targetGroups  []*AwsTargetGroup
 }
