@@ -43,7 +43,8 @@ type AwsTargetHealth struct {
 }
 
 type Dashboard struct {
-	instances     []*AwsInstance
-	loadBalancers []*AwsLoadBalancer
-	targetGroups  []*AwsTargetGroup
+	instances      []*AwsInstance
+	loadBalancers  []*AwsLoadBalancer
+	targetGroups   []*AwsTargetGroup
+	zoneByInstance map[string]string
 }

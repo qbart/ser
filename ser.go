@@ -2,18 +2,27 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/gdamore/tcell"
-	"github.com/rivo/tview"
+	ui "github.com/gizak/termui/v3"
+	"github.com/gizak/termui/v3/widgets"
 )
 
 func main() {
+	profile := "default"
 	dashboard := &Dashboard{}
-	session := awsNewSession(endpoints.EuWest1RegionID, "default")
+	session := awsNewSession(endpoints.EuWest1RegionID, profile)
+	dashboard.zoneByInstance = make(map[string]string)
 	dashboard.instances = awsGetInstances(session)
+	dashboard.loadBalancers = awsGetLoadBalancers(session)
+	dashboard.targetGroups = awsGetTargetGroups(session)
+	for _, target := range dashboard.targetGroups {
+		target.targets = awsGetTargetHealth(session, target.arn)
+	}
+
 	sort.Slice(dashboard.instances, func(i, j int) bool {
 		a := dashboard.instances[i]
 		b := dashboard.instances[j]
@@ -26,72 +35,151 @@ func main() {
 		return a.environment > b.environment
 	})
 
-	app := tview.NewApplication()
-	pages := tview.NewPages()
-
-	instancesTable := tview.NewTable().SetBorders(true)
-
-	pages.AddPage("Instances", instancesTable, false, true)
-	instancesTable.SetCell(0, 0, tview.NewTableCell("Environment").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 1, tview.NewTableCell("State").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 2, tview.NewTableCell("Name").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 3, tview.NewTableCell("Type").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 4, tview.NewTableCell("IPv4").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 5, tview.NewTableCell("Zone").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 6, tview.NewTableCell("ID").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 7, tview.NewTableCell("AMI").SetTextColor(tcell.ColorYellow))
-	instancesTable.SetCell(0, 8, tview.NewTableCell("Launch time").SetTextColor(tcell.ColorYellow))
-
-	for i, instance := range dashboard.instances {
-		instancesTable.SetCell(i+1, 0, tview.NewTableCell(instance.environment))
-		instancesTable.SetCell(i+1, 1, tview.NewTableCell(Dot).SetTextColor(awsInstanceStatusColor(instance.state)).SetAlign(tview.AlignCenter))
-		instancesTable.SetCell(i+1, 2, tview.NewTableCell(instance.name))
-		instancesTable.SetCell(i+1, 3, tview.NewTableCell(instance.kind))
-		instancesTable.SetCell(i+1, 4, tview.NewTableCell(instance.ipv4))
-		instancesTable.SetCell(i+1, 5, tview.NewTableCell(instance.zone))
-		instancesTable.SetCell(i+1, 6, tview.NewTableCell(instance.id))
-		instancesTable.SetCell(i+1, 7, tview.NewTableCell(instance.ami))
-		instancesTable.SetCell(i+1, 8, tview.NewTableCell(instance.launchTime.Format("02-01-2006 15:04 MST")))
+	if err := ui.Init(); err != nil {
+		log.Fatalf("Failed to initialize ser: %v", err)
 	}
+	defer ui.Close()
 
-	flex := tview.NewFlex().AddItem(instancesTable, 0, 1, false)
-
-	if err := app.SetRoot(flex, true).SetFocus(pages).Run(); err != nil {
-		panic(err)
+	instancesData := [][]string{
+		[]string{"Environment", "State", "Name", "Type", "IPv4", "Zone", "ID", "AMI", "Launch time"},
 	}
-
-	// session := awsNewSession(endpoints.EuWest1RegionID, "default")
-	// dashboard.instances = awsGetInstances(session)
-	// dashboard.loadBalancers = awsGetLoadBalancers(session)
-	// dashboard.targetGroups = awsGetTargetGroups(session)
-
-	for _, balancer := range dashboard.loadBalancers {
-		fmt.Println(awsLoadBalancerStatusDot(balancer.state))
-		fmt.Println(balancer.name)
-		fmt.Println(balancer.dns)
-		fmt.Println(balancer.kind)
-		fmt.Println(balancer.scheme)
-		fmt.Println(strings.Join(balancer.zones, ", "))
-		fmt.Println("----------")
-	}
-
-	for _, target := range dashboard.targetGroups {
-		fmt.Println(target.arn)
-		fmt.Println(target.kind)
-		fmt.Println(target.name)
-		fmt.Println(target.port)
-		fmt.Println(target.protocol)
-		fmt.Println(strings.Join(target.loadBalancerArns, ", "))
-		// target.targets = awsGetTargetHealth(session, target.arn)
-
-		for _, t := range target.targets {
-			fmt.Printf("  %s\n", awsTargetHealthStatusDot(t.state))
-			fmt.Printf("  %s\n", t.instanceId)
-			fmt.Printf("  %d\n", t.port)
-			fmt.Printf("  %s\n", t.reason)
-			fmt.Printf("  %s\n", t.zone)
-			fmt.Println("  --")
+	for _, instance := range dashboard.instances {
+		row := []string{
+			instance.environment,
+			awsInstanceStatus(instance.state),
+			instance.name,
+			instance.kind,
+			instance.ipv4,
+			instance.zone,
+			instance.id,
+			instance.ami,
+			instance.launchTime.Format("02-01-2006 15:04 MST"),
 		}
-		fmt.Println("----------")
+		dashboard.zoneByInstance[instance.id] = instance.zone
+		instancesData = append(instancesData, row)
+	}
+
+	tgData := [][]string{
+		[]string{"Instance ID", "Zone", "Port"},
+	}
+
+	for _, tg := range dashboard.targetGroups {
+		row := []string{
+			fmt.Sprintf("%s (%s)", tg.name, tg.kind),
+			"",
+			fmt.Sprintf("%s -> %d", tg.protocol, tg.port),
+		}
+		tgData = append(tgData, row)
+
+		for _, t := range tg.targets {
+			reason := fmt.Sprintf(" (%s)", t.reason)
+			if len(t.reason) == 0 {
+				reason = ""
+			}
+			zone := t.zone
+			if len(zone) == 0 {
+				zone = dashboard.zoneByInstance[t.instanceId]
+			}
+			row := []string{
+				fmt.Sprintf("  %s", t.instanceId),
+				zone,
+				fmt.Sprintf("%6d %s%s", t.port, t.state, reason),
+			}
+			tgData = append(tgData, row)
+		}
+	}
+
+	lbData := [][]string{
+		[]string{"State", "Name", "Dns", "Kind", "Scheme", "Zones"},
+	}
+	for _, balancer := range dashboard.loadBalancers {
+		row := []string{
+			balancer.state,
+			balancer.name,
+			balancer.dns,
+			balancer.kind,
+			balancer.scheme,
+			strings.Join(balancer.zones, ", "),
+		}
+
+		lbData = append(lbData, row)
+	}
+
+	table1 := widgets.NewTable()
+	table1.Border = false
+	table1.Rows = instancesData
+	table1.TextStyle = ui.NewStyle(ui.ColorWhite)
+	table1.RowSeparator = false
+	table1.FillRow = true
+	table1.RowStyles[0] = ui.NewStyle(ui.ColorWhite, ui.ColorBlue, ui.ModifierBold)
+
+	table2 := widgets.NewTable()
+	table2.Border = false
+	table2.Rows = tgData
+	table2.TextStyle = ui.NewStyle(ui.ColorWhite)
+	table2.RowSeparator = false
+	table2.FillRow = true
+	table2.RowStyles[0] = ui.NewStyle(ui.ColorWhite, ui.ColorBlue, ui.ModifierBold)
+
+	table3 := widgets.NewTable()
+	table3.Border = false
+	table3.Rows = lbData
+	table3.TextStyle = ui.NewStyle(ui.ColorWhite)
+	table3.RowSeparator = false
+	table3.FillRow = true
+	table3.RowStyles[0] = ui.NewStyle(ui.ColorWhite, ui.ColorBlue, ui.ModifierBold)
+
+	termWidth, termHeight := ui.TerminalDimensions()
+	tabpane := widgets.NewTabPane("Instances", "Target groups", "Load balancers")
+	tabpane.SetRect(0, 0, termWidth, 1)
+	tabpane.Border = false
+	grid := ui.NewGrid()
+	grid.Border = false
+	grid.SetRect(0, 1, termWidth, termHeight-1)
+
+	renderTab := func() {
+		ui.Clear()
+		switch tabpane.ActiveTabIndex {
+		case 0:
+			grid.Set(
+				ui.NewRow(1.0, ui.NewCol(1.0, table1)),
+			)
+
+			ui.Render(tabpane, grid)
+			ui.Render(table1)
+
+		case 1:
+			grid.Set(
+				ui.NewRow(1.0, ui.NewCol(1.0, table2)),
+			)
+
+			ui.Render(tabpane, grid)
+			ui.Render(table2)
+
+		case 2:
+			grid.Set(
+				ui.NewRow(1.0, ui.NewCol(1.0, table3)),
+			)
+
+			ui.Render(tabpane, grid)
+			ui.Render(table3)
+		}
+	}
+
+	renderTab()
+	uiEvents := ui.PollEvents()
+
+	for {
+		e := <-uiEvents
+		switch e.ID {
+		case "q", "<C-c>":
+			return
+		case "j":
+			tabpane.FocusLeft()
+			renderTab()
+		case ";":
+			tabpane.FocusRight()
+			renderTab()
+		}
 	}
 }

@@ -50,6 +50,23 @@ func toS(str *string) string {
 	return *str
 }
 
+func awsInstanceStatus(state int64) string {
+	switch state {
+	case 16:
+		return "running"
+	case 32:
+		return "shutting-down"
+	case 48:
+		return "terminated"
+	case 64:
+		return "stopping"
+	case 80:
+		return "stopped"
+	default:
+		return "pending"
+	}
+}
+
 func awsInstanceStatusColor(state int64) tcell.Color {
 	// 0 (pending)
 	// 16 (running)
