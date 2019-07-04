@@ -1,6 +1,9 @@
-# ser
+# ser :cheese:
 
-Dashboard (WIP)
+Usage:
+```
+ser <aws-profile-name>
+```
 
 ## Policy
 
