@@ -2,19 +2,12 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/gdamore/tcell"
+	"sort"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 )
-
-const Dot = "●"
-const DotRed = "\033[31m●\033[0m"
-const DotGreen = "\033[32m●\033[0m"
-const DotYellow = "\033[33m●\033[0m"
-const DotGrey = "\033[90m●\033[0m"
 
 func awsFindTag(tags []*ec2.Tag, lookupValue string) *string {
 	for _, tag := range tags {
@@ -62,59 +55,8 @@ func awsInstanceStatus(state int64) string {
 		return "stopping"
 	case 80:
 		return "stopped"
-	default:
+	default: // 0
 		return "pending"
-	}
-}
-
-func awsInstanceStatusColor(state int64) tcell.Color {
-	// 0 (pending)
-	// 16 (running)
-	// 32 (shutting-down)
-	// 48 (terminated)
-	// 64 (stopping)
-	// 80 (stopped)
-
-	switch state {
-	case 16:
-		return tcell.ColorGreen
-	case 48, 80:
-		return tcell.ColorRed
-	default:
-		return tcell.ColorYellow
-	}
-}
-
-func awsLoadBalancerStatusDot(state string) string {
-	// active | provisioning | active_impaired | failed
-
-	switch state {
-	case "active":
-		return DotGreen
-	case "failed":
-		return DotRed
-	default:
-		return DotYellow
-	}
-}
-
-func awsTargetHealthStatusDot(state string) string {
-	// "initial"
-	// "healthy"
-	// "unhealthy"
-	// "unused"
-	// "draining"
-	// "unavailable"
-
-	switch state {
-	case "healthy":
-		return DotGreen
-	case "unhealthy", "unavailable":
-		return DotRed
-	case "unused":
-		return DotGrey
-	default:
-		return DotYellow
 	}
 }
 
@@ -134,4 +76,18 @@ func awsCopyList(list []*string) []string {
 		result[i] = *str
 	}
 	return result
+}
+
+func awsSortInstances(list []*AwsInstance) {
+	sort.Slice(list, func(i, j int) bool {
+		a := list[i]
+		b := list[j]
+		if a.environment == b.environment {
+			if a.name == b.name {
+				return a.zone < b.zone
+			}
+			return a.name < b.name
+		}
+		return a.environment > b.environment
+	})
 }
