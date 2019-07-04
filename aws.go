@@ -16,6 +16,7 @@ import (
 func awsPoolingLoop(
 	profile string,
 	// out
+	messages chan string,
 	instances chan [][]string,
 	targetGroups chan [][]string,
 	loadBalancers chan [][]string,
@@ -33,20 +34,20 @@ func awsPoolingLoop(
 	targetGroupsAPI := make(chan []*AwsTargetGroup)
 	loadBalancersAPI := make(chan []*AwsLoadBalancer)
 
-	go awsGetInstances(session, instancesAPI)
-	go awsGetTargetGroups(session, targetGroupsAPI)
-	go awsGetLoadBalancers(session, loadBalancersAPI)
+	go awsGetInstances(session, messages, instancesAPI)
+	go awsGetTargetGroups(session, messages, targetGroupsAPI)
+	go awsGetLoadBalancers(session, messages, loadBalancersAPI)
 
 	for {
 		select {
 		case <-every15s:
-			go awsGetTargetGroups(session, targetGroupsAPI)
+			go awsGetTargetGroups(session, messages, targetGroupsAPI)
 
 		case <-every30s:
-			go awsGetInstances(session, instancesAPI)
+			go awsGetInstances(session, messages, instancesAPI)
 
 		case <-every60s:
-			go awsGetLoadBalancers(session, loadBalancersAPI)
+			go awsGetLoadBalancers(session, messages, loadBalancersAPI)
 
 		case dashboard.instances = <-instancesAPI:
 			dashboard.zoneByInstance = make(map[string]string)
@@ -134,12 +135,12 @@ func awsNewSession(region string, profile string) *session.Session {
 	}))
 }
 
-func awsGetInstances(sess *session.Session, out chan<- []*AwsInstance) {
+func awsGetInstances(sess *session.Session, msg chan string, out chan<- []*AwsInstance) {
 	client := ec2.New(sess)
 	input := &ec2.DescribeInstancesInput{}
 
 	response, err := client.DescribeInstances(input)
-	awsCheckErrors(err)
+	awsCheckErrors(msg, err)
 
 	result := make([]*AwsInstance, 0)
 
@@ -164,12 +165,12 @@ func awsGetInstances(sess *session.Session, out chan<- []*AwsInstance) {
 	out <- result
 }
 
-func awsGetLoadBalancers(sess *session.Session, out chan<- []*AwsLoadBalancer) {
+func awsGetLoadBalancers(sess *session.Session, msg chan string, out chan<- []*AwsLoadBalancer) {
 	client := elbv2.New(sess)
 	input := &elbv2.DescribeLoadBalancersInput{}
 
 	response, err := client.DescribeLoadBalancers(input)
-	awsCheckErrors(err)
+	awsCheckErrors(msg, err)
 
 	result := make([]*AwsLoadBalancer, 0)
 
@@ -189,7 +190,7 @@ func awsGetLoadBalancers(sess *session.Session, out chan<- []*AwsLoadBalancer) {
 	out <- result
 }
 
-func awsGetTargetGroups(sess *session.Session, out chan<- []*AwsTargetGroup) {
+func awsGetTargetGroups(sess *session.Session, msg chan string, out chan<- []*AwsTargetGroup) {
 	client := elbv2.New(sess)
 	input := &elbv2.DescribeTargetGroupsInput{}
 
@@ -199,7 +200,7 @@ func awsGetTargetGroups(sess *session.Session, out chan<- []*AwsTargetGroup) {
 	}
 
 	response, err := client.DescribeTargetGroups(input)
-	awsCheckErrors(err)
+	awsCheckErrors(msg, err)
 
 	result := make([]*AwsTargetGroup, 0)
 	targets := make(chan Row, len(response.TargetGroups))
@@ -216,7 +217,7 @@ func awsGetTargetGroups(sess *session.Session, out chan<- []*AwsTargetGroup) {
 		result = append(result, row)
 
 		go func(arn string, i int, out chan Row) {
-			rows := awsGetTargetHealths(sess, arn)
+			rows := awsGetTargetHealths(sess, msg, arn)
 			out <- Row{
 				i:       i,
 				targets: rows,
@@ -232,14 +233,14 @@ func awsGetTargetGroups(sess *session.Session, out chan<- []*AwsTargetGroup) {
 	out <- result
 }
 
-func awsGetTargetHealths(sess *session.Session, arn string) []*AwsTargetHealth {
+func awsGetTargetHealths(sess *session.Session, msg chan string, arn string) []*AwsTargetHealth {
 	client := elbv2.New(sess)
 	input := &elbv2.DescribeTargetHealthInput{
 		TargetGroupArn: aws.String(arn),
 	}
 
 	response, err := client.DescribeTargetHealth(input)
-	awsCheckErrors(err)
+	awsCheckErrors(msg, err)
 
 	result := make([]*AwsTargetHealth, 0)
 

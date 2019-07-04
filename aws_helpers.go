@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -19,20 +18,17 @@ func awsFindTag(tags []*ec2.Tag, lookupValue string) *string {
 	return nil
 }
 
-func awsCheckErrors(err error) bool {
+func awsCheckErrors(out chan string, err error) {
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			default:
-				fmt.Println(aerr.Error())
+				out <- aerr.Error()
 			}
 		} else {
-			fmt.Println(err.Error())
+			out <- err.Error()
 		}
-		return true
 	}
-
-	return false
 }
 
 func toS(str *string) string {

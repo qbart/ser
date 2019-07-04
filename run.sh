@@ -1,1 +1,1 @@
-go build -i . && ./ser
+go build -i . && ./ser $1
