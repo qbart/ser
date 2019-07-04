@@ -1,6 +1,6 @@
 # ser :cheese:
 
-Ser is a small monitoring tools for your AWS instances, targets groups, load balancers, ECS.
+Ser is a small monitoring tool for your AWS instances, targets groups, load balancers, ECS.
 
 ![Preview](./res/preview.png)
 
