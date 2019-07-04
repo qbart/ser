@@ -1,6 +1,10 @@
 # ser :cheese:
 
-Usage:
+Ser is a small monitoring tools for your AWS instances, targets groups, load balancers, ECS.
+
+![Preview](./res/preview.png)
+
+## Usage
 ```
 ser <aws-profile-name>
 ```
