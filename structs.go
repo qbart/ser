@@ -2,6 +2,21 @@ package main
 
 import "time"
 
+type AwsCodePipeline struct {
+	name   string
+	stages []*AwsCodePipelineStage
+}
+
+type AwsCodePipelineStage struct {
+	name    string
+	actions []*AwsCodePipelineAction
+}
+
+type AwsCodePipelineAction struct {
+	name   string
+	status string
+}
+
 type AwsInstance struct {
 	state       int64
 	ami         string
@@ -43,6 +58,7 @@ type AwsTargetHealth struct {
 }
 
 type Dashboard struct {
+	pipelines      []*AwsCodePipeline
 	instances      []*AwsInstance
 	loadBalancers  []*AwsLoadBalancer
 	targetGroups   []*AwsTargetGroup

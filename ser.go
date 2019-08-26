@@ -15,7 +15,7 @@ func emptyTableData() [][]string {
 var (
 	ColorOrange ui.Color = 202
 	ColorPink   ui.Color = 198
-	tabNames    []string = []string{"Instances", "Target groups", "Load balancers"}
+	tabNames    []string = []string{"Pipelines", "Instances", "Target groups", "Load balancers"}
 )
 
 var (
@@ -34,10 +34,11 @@ func main() {
 	kingpin.Parse()
 
 	messagesCh := make(chan string)
+	codePipelinesCh := make(chan [][]string)
 	instancesCh := make(chan [][]string)
 	targetGroupsCh := make(chan [][]string)
 	loadBalancersCh := make(chan [][]string)
-	go awsPoolingLoop(*argProfile, messagesCh, instancesCh, targetGroupsCh, loadBalancersCh)
+	go awsPoolingLoop(*argProfile, messagesCh, codePipelinesCh, instancesCh, targetGroupsCh, loadBalancersCh)
 
 	uiTables := make([]*widgets.Table, len(tabNames))
 	uiGrids := make([]*ui.Grid, len(tabNames))
@@ -66,10 +67,8 @@ func main() {
 
 		uiGrids[i] = grid
 		uiTables[i] = tab
+		uiTables[i].Rows = emptyTableData()
 	}
-	uiTables[0].Rows = emptyTableData()
-	uiTables[1].Rows = emptyTableData()
-	uiTables[2].Rows = emptyTableData()
 
 	for i := 0; i < len(tabNames); i++ {
 		uiTables[i].RowStyles[0] = ui.NewStyle(ui.ColorWhite, ColorOrange, ui.ModifierBold)
@@ -94,16 +93,20 @@ func main() {
 			uiFooter.Text = msg
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
-		case rows := <-instancesCh:
+		case rows := <-codePipelinesCh:
 			uiTables[0].Rows = rows
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
-		case rows := <-targetGroupsCh:
+		case rows := <-instancesCh:
 			uiTables[1].Rows = rows
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
-		case rows := <-loadBalancersCh:
+		case rows := <-targetGroupsCh:
 			uiTables[2].Rows = rows
+			uiRenderTab(uiTabs.ActiveTabIndex)
+
+		case rows := <-loadBalancersCh:
+			uiTables[3].Rows = rows
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
 		case e := <-uiEvents:

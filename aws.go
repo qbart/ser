@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/codepipeline"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 )
@@ -17,6 +18,7 @@ func awsPoolingLoop(
 	profile string,
 	// out
 	messages chan string,
+	codePipelines chan [][]string,
 	instances chan [][]string,
 	targetGroups chan [][]string,
 	loadBalancers chan [][]string,
@@ -30,10 +32,12 @@ func awsPoolingLoop(
 	every30s := time.Tick(30 * time.Second)
 	every60s := time.Tick(60 * time.Second)
 
+	codePipelinesAPI := make(chan []*AwsCodePipeline)
 	instancesAPI := make(chan []*AwsInstance)
 	targetGroupsAPI := make(chan []*AwsTargetGroup)
 	loadBalancersAPI := make(chan []*AwsLoadBalancer)
 
+	go awsGetCodePipelines(session, messages, codePipelinesAPI)
 	go awsGetInstances(session, messages, instancesAPI)
 	go awsGetTargetGroups(session, messages, targetGroupsAPI)
 	go awsGetLoadBalancers(session, messages, loadBalancersAPI)
@@ -41,6 +45,7 @@ func awsPoolingLoop(
 	for {
 		select {
 		case <-every15s:
+			go awsGetCodePipelines(session, messages, codePipelinesAPI)
 			go awsGetTargetGroups(session, messages, targetGroupsAPI)
 
 		case <-every30s:
@@ -48,6 +53,28 @@ func awsPoolingLoop(
 
 		case <-every60s:
 			go awsGetLoadBalancers(session, messages, loadBalancersAPI)
+
+		case dashboard.pipelines = <-codePipelinesAPI:
+			rows := [][]string{
+				[]string{"Name", "Stage", ""},
+			}
+			for _, pipeline := range dashboard.pipelines {
+				row := []string{
+					pipeline.name,
+				}
+				rows = append(rows, row)
+
+				for _, stage := range pipeline.stages {
+					row := []string{
+						"",
+						stage.name,
+						strings.Join(awsPipelineActionsToList(stage.actions), " | "),
+					}
+					rows = append(rows, row)
+				}
+			}
+
+			codePipelines <- rows
 
 		case dashboard.instances = <-instancesAPI:
 			dashboard.zoneByInstance = make(map[string]string)
@@ -133,6 +160,44 @@ func awsNewSession(region string, profile string) *session.Session {
 		Region:      aws.String(region),
 		Credentials: credentials.NewSharedCredentials("", profile),
 	}))
+}
+
+func awsGetCodePipelines(sess *session.Session, msg chan string, out chan<- []*AwsCodePipeline) {
+	client := codepipeline.New(sess)
+	input := &codepipeline.ListPipelinesInput{}
+
+	type Row struct {
+		i      int
+		stages []*AwsCodePipelineStage
+	}
+
+	response, err := client.ListPipelines(input)
+	awsCheckErrors(msg, err)
+
+	result := make([]*AwsCodePipeline, 0)
+	actions := make(chan Row, len(response.Pipelines))
+
+	for i, pipeline := range response.Pipelines {
+		row := &AwsCodePipeline{
+			name: toS(pipeline.Name),
+		}
+		result = append(result, row)
+
+		go func(name string, i int, out chan Row) {
+			rows := awsGetCodePipelineStages(sess, msg, name)
+			out <- Row{
+				i:      i,
+				stages: rows,
+			}
+		}(row.name, i, actions)
+	}
+
+	for i := 0; i < len(response.Pipelines); i++ {
+		row := <-actions
+		result[row.i].stages = row.stages
+	}
+
+	out <- result
 }
 
 func awsGetInstances(sess *session.Session, msg chan string, out chan<- []*AwsInstance) {
@@ -231,6 +296,72 @@ func awsGetTargetGroups(sess *session.Session, msg chan string, out chan<- []*Aw
 	}
 
 	out <- result
+}
+
+func awsGetCodePipelineStages(sess *session.Session, msg chan string, name string) []*AwsCodePipelineStage {
+	client := codepipeline.New(sess)
+
+	input := &codepipeline.GetPipelineInput{
+		Name: aws.String(name),
+	}
+	response, err := client.GetPipeline(input)
+	awsCheckErrors(msg, err)
+
+	executionID := awsGetCodePipelineGetLastExecution(sess, msg, name)
+	inputA := &codepipeline.ListActionExecutionsInput{
+		PipelineName: aws.String(name),
+		Filter: &codepipeline.ActionExecutionFilter{
+			PipelineExecutionId: aws.String(executionID),
+		},
+	}
+
+	responseA, errA := client.ListActionExecutions(inputA)
+	awsCheckErrors(msg, errA)
+
+	statuses := make(map[string]string)
+	for _, details := range responseA.ActionExecutionDetails {
+		statuses[toS(details.ActionName)] = toS(details.Status)
+	}
+
+	result := make([]*AwsCodePipelineStage, 0)
+
+	for _, stage := range response.Pipeline.Stages {
+		row := &AwsCodePipelineStage{
+			name: toS(stage.Name),
+		}
+		row.actions = make([]*AwsCodePipelineAction, 0, len(stage.Actions))
+		for _, action := range stage.Actions {
+			status := "Didn't Run yet"
+			if val, ok := statuses[toS(action.Name)]; ok {
+				status = val
+			}
+			row.actions = append(row.actions, &AwsCodePipelineAction{
+				name:   toS(action.Name),
+				status: status,
+			})
+		}
+		result = append(result, row)
+	}
+
+	return result
+}
+
+func awsGetCodePipelineGetLastExecution(sess *session.Session, msg chan string, name string) string {
+	client := codepipeline.New(sess)
+
+	input := &codepipeline.ListPipelineExecutionsInput{
+		PipelineName: aws.String(name),
+		MaxResults:   aws.Int64(1),
+	}
+
+	response, err := client.ListPipelineExecutions(input)
+	awsCheckErrors(msg, err)
+
+	for _, exec := range response.PipelineExecutionSummaries {
+		return toS(exec.PipelineExecutionId)
+	}
+
+	return ""
 }
 
 func awsGetTargetHealths(sess *session.Session, msg chan string, arn string) []*AwsTargetHealth {

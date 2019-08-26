@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -54,6 +55,16 @@ func awsInstanceStatus(state int64) string {
 	default: // 0
 		return "pending"
 	}
+}
+
+func awsPipelineActionsToList(actions []*AwsCodePipelineAction) []string {
+	result := make([]string, len(actions))
+
+	for i, action := range actions {
+		result[i] = fmt.Sprintf("%s (%s)", action.name, action.status)
+	}
+
+	return result
 }
 
 func awsZonesToList(zones []*elbv2.AvailabilityZone) []string {
