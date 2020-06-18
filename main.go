@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
-	"github.com/alecthomas/kingpin"
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
+	"github.com/spf13/cobra"
 )
 
 func emptyTableData() [][]string {
@@ -18,27 +20,37 @@ var (
 	tabNames    []string = []string{"Pipelines", "Instances", "Target groups", "Load balancers"}
 )
 
-var (
-	argProfile = kingpin.
-		Arg("profile", "AWS profile name").
-		Default("default").
-		String()
-)
-
 func main() {
+	var rootCmd = &cobra.Command{
+		Use:  "ser profile [region=eu-west-1]",
+		Args: cobra.RangeArgs(1, 2),
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(args)
+			defaultRegion := "eu-west-1"
+			if len(args) > 1 {
+				defaultRegion = args[1]
+			}
+			app(args[0], defaultRegion)
+		},
+	}
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func app(profile string, region string) {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("Failed to initialize ser: %v", err)
 	}
 	defer ui.Close()
-
-	kingpin.Parse()
 
 	messagesCh := make(chan string)
 	codePipelinesCh := make(chan [][]string)
 	instancesCh := make(chan [][]string)
 	targetGroupsCh := make(chan [][]string)
 	loadBalancersCh := make(chan [][]string)
-	go awsPoolingLoop(*argProfile, messagesCh, codePipelinesCh, instancesCh, targetGroupsCh, loadBalancersCh)
+	go awsPoolingLoop(profile, region, messagesCh, codePipelinesCh, instancesCh, targetGroupsCh, loadBalancersCh)
 
 	uiTables := make([]*widgets.Table, len(tabNames))
 	uiGrids := make([]*ui.Grid, len(tabNames))

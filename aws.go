@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codepipeline"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -16,6 +15,7 @@ import (
 
 func awsPoolingLoop(
 	profile string,
+	region string,
 	// out
 	messages chan string,
 	codePipelines chan [][]string,
@@ -23,7 +23,7 @@ func awsPoolingLoop(
 	targetGroups chan [][]string,
 	loadBalancers chan [][]string,
 ) {
-	session := awsNewSession(endpoints.EuWest1RegionID, profile)
+	session := awsNewSession(region, profile)
 
 	dashboard := &Dashboard{}
 	dashboard.zoneByInstance = make(map[string]string)
