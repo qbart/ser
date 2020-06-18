@@ -79,7 +79,7 @@ func awsPoolingLoop(
 		case dashboard.instances = <-instancesAPI:
 			dashboard.zoneByInstance = make(map[string]string)
 			rows := [][]string{
-				[]string{"Environment", "State", "Name", "Type", "IPv4", "Zone", "ID", "AMI", "Launch time"},
+				[]string{"Environment", "State", "Name", "Type", "IPv4", "IPv4 Priv", "Zone", "ID", "AMI", "Launch time"},
 			}
 
 			for _, instance := range dashboard.instances {
@@ -89,6 +89,7 @@ func awsPoolingLoop(
 					instance.name,
 					instance.kind,
 					instance.ipv4,
+					instance.ipv4private,
 					instance.zone,
 					instance.id,
 					instance.ami,
@@ -214,6 +215,7 @@ func awsGetInstances(sess *session.Session, msg chan string, out chan<- []*AwsIn
 			row := &AwsInstance{
 				id:          toS(instance.InstanceId),
 				ipv4:        toS(instance.PublicIpAddress),
+				ipv4private: toS(instance.PrivateIpAddress),
 				kind:        toS(instance.InstanceType),
 				state:       *instance.State.Code,
 				ami:         toS(instance.ImageId),

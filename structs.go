@@ -21,6 +21,7 @@ type AwsInstance struct {
 	state       int64
 	ami         string
 	ipv4        string
+	ipv4private string
 	id          string
 	kind        string
 	zone        string
