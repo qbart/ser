@@ -6,8 +6,9 @@ Ser is a small monitoring tool for your AWS instances, targets groups, load bala
 
 ## Usage
 ```
-ser <aws-profile-name>
+ser <aws-profile-name> <region>
 ```
+Default region is `eu-west-1`
 
 ## Policy
 
