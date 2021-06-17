@@ -79,21 +79,43 @@ func awsPoolingLoop(
 		case dashboard.instances = <-instancesAPI:
 			dashboard.zoneByInstance = make(map[string]string)
 			rows := [][]string{
-				[]string{"Environment", "State", "Name", "Type", "IPv4", "IPv4 Priv", "Zone", "ID", "AMI", "Launch time"},
+				// []string{"Environment", "State", "Name", "Type", "IPv4", "IPv4 Priv", "Zone", "ID", "AMI", "Launch time"},
+				{"ID", "State", "Type", "IP", "AMI", "Launch time"},
 			}
 
 			for _, instance := range dashboard.instances {
 				row := []string{
-					instance.environment,
-					awsInstanceStatus(instance.state),
-					instance.name,
-					instance.kind,
-					instance.ipv4,
-					instance.ipv4private,
-					instance.zone,
 					instance.id,
+					awsInstanceStatus(instance.state),
+					instance.kind,
+					instance.ipv4private,
 					instance.ami,
-					instance.launchTime.Format("02-01-2006 15:04 MST"),
+					instance.launchTime.Format("02-01-2006"),
+				}
+				rows = append(rows, row)
+
+				publicIp := ""
+				if instance.ipv4 != "" {
+					publicIp = fmt.Sprint(instance.ipv4, " 🌍")
+				}
+
+				row = []string{
+					instance.name,
+					"",
+					instance.zone,
+					publicIp,
+					"",
+					instance.launchTime.Format(" 15:04 MST"),
+				}
+				rows = append(rows, row)
+
+				row = []string{
+					instance.environment,
+					"",
+					"",
+					"",
+					"",
+					"",
 				}
 				rows = append(rows, row)
 				dashboard.zoneByInstance[instance.id] = instance.zone
@@ -103,7 +125,7 @@ func awsPoolingLoop(
 
 		case dashboard.targetGroups = <-targetGroupsAPI:
 			rows := [][]string{
-				[]string{"Instance ID", "Zone", "Port"},
+				{"Instance ID", "Zone", "Port"},
 			}
 
 			for _, tg := range dashboard.targetGroups {

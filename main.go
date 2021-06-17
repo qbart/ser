@@ -17,7 +17,7 @@ func emptyTableData() [][]string {
 var (
 	ColorOrange ui.Color = 202
 	ColorPink   ui.Color = 198
-	tabNames    []string = []string{"Pipelines", "Instances", "Target groups", "Load balancers"}
+	tabNames    []string = []string{"Instances", "Pipelines", "Target groups", "Load balancers"}
 )
 
 func main() {
@@ -105,11 +105,11 @@ func app(profile string, region string) {
 			uiFooter.Text = msg
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
-		case rows := <-codePipelinesCh:
+		case rows := <-instancesCh:
 			uiTables[0].Rows = rows
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
-		case rows := <-instancesCh:
+		case rows := <-codePipelinesCh:
 			uiTables[1].Rows = rows
 			uiRenderTab(uiTabs.ActiveTabIndex)
 
