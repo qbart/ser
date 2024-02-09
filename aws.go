@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/codepipeline"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -180,8 +179,7 @@ func awsPoolingLoop(
 
 func awsNewSession(region string, profile string) *session.Session {
 	return session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewSharedCredentials("", profile),
+		Region: aws.String(region),
 	}))
 }
 

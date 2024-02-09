@@ -22,15 +22,10 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:  "ser profile [region=eu-west-1]",
-		Args: cobra.RangeArgs(1, 2),
+		Use:  "ser <region>",
+		Args: cobra.RangeArgs(1, 1),
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(args)
-			defaultRegion := "eu-west-1"
-			if len(args) > 1 {
-				defaultRegion = args[1]
-			}
-			app(args[0], defaultRegion)
+			app("<deprecated>", args[0])
 		},
 	}
 	if err := rootCmd.Execute(); err != nil {
